@@ -25,8 +25,8 @@ from typing import Any
 
 Celsius: Any = float
 
-WEATHER_API_KEY = '8a0f716c66cf241b78dc7335c30fadb6'
-BOT_API_TOKEN = '5946859917:AAGtiScm-Cvo5AWGKZPQsxq_oqoZqE5Ndpg'
+from weatherAPI_token import WEATHER_API_KEY 
+from telegram_token import BOT_API_TOKEN 
 
 CURRENT_WEATHER_API_CALL = (
         'https://api.openweathermap.org/data/2.5/weather?'
