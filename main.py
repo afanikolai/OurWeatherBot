@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from typing import Any
+from time import sleep, perf_counter
+from threading import Thread
 import pandas as pd
 
 Celsius: Any = float
@@ -120,19 +122,14 @@ async def process_callback_download_weather_history(callback_query: types.Callba
     )
 
 def save_weather(user_id):
-    # cn = pd.DataFrame(columns=['user_id', 'timestamp', 'weather'])
-    # cn.to_csv('saved.csv')
-    # db = pd.read_csv('saved.csv')
-    # print(db)
-    new_row = [[user_id, datetime.now(), 'jksdfndsjkfdf']]
-    # db = pd.concat([pd.DataFrame(new_row, columns=['user_id', 'timestamp', 'weather']), db], ignore_index=True)
-    db = pd.DataFrame(new_row, columns=['user_id', 'timestamp', 'weather'])
+    cols = ["user_id", "timestamp", "weather"]
+    db = pd.read_csv('saved.csv', usecols=cols)
+    new_row = pd.DataFrame({'user_id': [user_id], 'timestamp': [datetime.now()], 'weather': [get_weather(get_coordinates())]})
+    db.reset_index(drop=True, inplace=True)
+    new_row.reset_index(drop=True, inplace=True)
+    db = pd.concat([db, new_row], ignore_index=True)
     print(db)
     db.to_csv('saved.csv')
-    bot.send_message(
-        user_id,
-        'Сохранил погоду в вашем городе'
-    )
 
 class WindDirection(IntEnum):
     North = 0
@@ -210,11 +207,18 @@ def _parse_wind_direction(openweather_dict: dict) -> str:
 
 BTN_WEATHER = InlineKeyboardButton('Прогноз погоды по IP', callback_data='weather')
 BTN_CITY_WEATHER = InlineKeyboardButton('Прогноз погоды по введному городу', callback_data='city_weather')
-BTN_SUBSCRIBE_FOR_HISTORY = InlineKeyboardButton('Подписаться на сохранение данных о погоде', callback_data='subscribe')
-BTN_DOWNLOAD_WEATHER_HISTORY = InlineKeyboardButton('Прогноз погоды по введному городу', callback_data='weather_history')
+# BTN_SUBSCRIBE_FOR_HISTORY = InlineKeyboardButton('Подписаться на сохранение данных о погоде', callback_data='subscribe')
+# BTN_DOWNLOAD_WEATHER_HISTORY = InlineKeyboardButton('Прогноз погоды по введному городу', callback_data='weather_history')
 
-WEATHER = InlineKeyboardMarkup().add(BTN_WEATHER).add(BTN_CITY_WEATHER).add(BTN_SUBSCRIBE_FOR_HISTORY).add(BTN_DOWNLOAD_WEATHER_HISTORY)
+WEATHER = InlineKeyboardMarkup().add(BTN_WEATHER).add(BTN_CITY_WEATHER)
 HELP = InlineKeyboardMarkup().add(BTN_WEATHER)
+
+def saver():
+    save_weather(2222)
+    sleep(7)
+
+def start_bot():
+    executor.start_polling(dp, skip_updates=True)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

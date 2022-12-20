@@ -1,1 +1,7 @@
-
+,user_id,timestamp,weather
+0,256840212,2022-12-20 22:14:04.734483,jksdfndsjkfdf
+1,256840212,2022-12-20 23:12:24.347214,jksdfndsjkfdf
+2,256840212,2022-12-20 23:12:49.286773,jksdfndsjkfdf
+3,256840212,2022-12-20 23:15:52.427917,jksdfndsjkfdf
+4,256840212,2022-12-20 23:16:08.699239,jksdfndsjkfdf
+5,2222,2022-12-20 23:19:34.851686,"Weather(location='Perm', temperature=-16.05, temperature_feeling=-23.05, description='Broken clouds', wind_speed=5, wind_direction='Southwest', sunrise=datetime.datetime(2022, 12, 20, 9, 58, 52), sunset=datetime.datetime(2022, 12, 20, 16, 26, 1))"
