@@ -109,10 +109,10 @@ async def process_callback_download_weather_history(callback_query: types.Callba
         subscribers[callback_query.from_user.id] = get_coordinates()
         await bot.send_message(
         callback_query.from_user.id,
-        'Теперь я буду сохранять историю погоды в вашем городе, вы можете скачать ее в любой момент')
+        'Теперь я буду сохранять историю погоды в вашем городе, вы можете скачать ее в любой момент', reply_markup=WEATHER)
     else: 
         await bot.send_message(callback_query.from_user.id,
-        'Вы уже подписаны на сохранение истории погоды')
+        'Вы уже подписаны на сохранение истории погоды', reply_markup=WEATHER)
 
 @dp.callback_query_handler(text='unsubscribe')
 async def process_callback_download_weather_history(callback_query: types.CallbackQuery):
@@ -124,10 +124,10 @@ async def process_callback_download_weather_history(callback_query: types.Callba
         df.to_csv('saved.csv')
         await bot.send_message(
         callback_query.from_user.id,
-        'Больше не буду сохранять погоду для вас')
+        'Больше не буду сохранять погоду для вас', reply_markup=WEATHER)
     else: 
         await bot.send_message(callback_query.from_user.id,
-        'Вы не подписаны на сохранение истории погоды')
+        'Вы не подписаны на сохранение истории погоды', reply_markup=WEATHER)
 
 @dp.callback_query_handler(text='download_weather_history')
 async def process_callback_download_weather_history(callback_query: types.CallbackQuery):
@@ -141,7 +141,7 @@ async def process_callback_download_weather_history(callback_query: types.Callba
         os.remove("Weather_history.csv")
     else: 
         await bot.send_message(callback_query.from_user.id,
-        'Вы не подписаны на сохранение истории погоды, подпишитесь :)')
+        'Вы не подписаны на сохранение истории погоды, подпишитесь :)', reply_markup=WEATHER)
 
 def save_weather(user_id, coordinates):
     cols = ["user_id", "lat", "lon", "timestamp", "weather"]
