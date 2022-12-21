@@ -1,4 +1,4 @@
-import telebot, json
+import telebot, json, os
 from telebot import types
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,18 +8,16 @@ from datetime import datetime
 from enum import IntEnum
 from typing import Any
 from time import sleep, perf_counter
-from threading import Thread
+from threading import Thread, Event
 import pandas as pd
 
 Celsius: Any = float
 city_db = pd.read_csv('city.csv')
-subscribers = []
+subscribers = {}
+save_delay = 10
 
-# from weatherAPI_token import WEATHER_API_KEY 
-# from telegram_token import BOT_API_TOKEN 
-
-WEATHER_API_KEY = '8a0f716c66cf241b78dc7335c30fadb6'
-BOT_API_TOKEN = '5875564735:AAGmsD1ASAelOBvacPpH5eIbmFVii1lWPbY'
+from weatherAPI_token import WEATHER_API_KEY 
+from telegram_token import BOT_API_TOKEN 
 
 CURRENT_WEATHER_API_CALL = (
         'https://api.openweathermap.org/data/2.5/weather?'
@@ -58,7 +56,7 @@ def start() -> str:
     """Returns a message about the temperature and weather description"""
     return f'Привет этот бот говорит погоду по IP адресу или введенному слову\n' \
            f'Нажми нужную клавишу \n' \
-           f'Введи /help для открытия српавки \n'\
+           f'Введи /help для открытия справки \n'\
            
 bot = Bot(token=BOT_API_TOKEN)
 dp = Dispatcher(bot)
@@ -106,25 +104,54 @@ async def process_callback_city_weather(callback_query: types.CallbackQuery):
 
 @dp.callback_query_handler(text='subscribe')
 async def process_callback_download_weather_history(callback_query: types.CallbackQuery):
-    # Добавляем пользователя в список подписчиков
-    subscribers.append(callback_query.from_user.id)
-    save_weather(callback_query.from_user.id)
-    await bot.send_message(
+    if not subscribers.keys().__contains__(callback_query.from_user.id):
+        # Добавляем пользователя и его координаты в список подписчиков
+        subscribers[callback_query.from_user.id] = get_coordinates()
+        await bot.send_message(
         callback_query.from_user.id,
-        'Теперь я буду сохранять историю погоды в вашем городе, вы можете скачать ее в любой момент'
-    )
+        'Теперь я буду сохранять историю погоды в вашем городе, вы можете скачать ее в любой момент')
+    else: 
+        await bot.send_message(callback_query.from_user.id,
+        'Вы уже подписаны на сохранение истории погоды')
 
-@dp.callback_query_handler(text='weather_history')
+@dp.callback_query_handler(text='unsubscribe')
 async def process_callback_download_weather_history(callback_query: types.CallbackQuery):
-    await bot.send_message(
+    if subscribers.keys().__contains__(callback_query.from_user.id):
+        del subscribers[callback_query.from_user.id]
+        cols = ["user_id", "lat", "lon", "timestamp", "weather"]
+        df = pd.read_csv('saved.csv', usecols=cols)
+        df.drop(df[df['user_id'] == callback_query.from_user.id].index, inplace = True)
+        df.to_csv('saved.csv')
+        await bot.send_message(
         callback_query.from_user.id,
-        'История скачана'
-    )
+        'Больше не буду сохранять погоду для вас')
+    else: 
+        await bot.send_message(callback_query.from_user.id,
+        'Вы не подписаны на сохранение истории погоды')
 
-def save_weather(user_id):
-    cols = ["user_id", "timestamp", "weather"]
+@dp.callback_query_handler(text='download_weather_history')
+async def process_callback_download_weather_history(callback_query: types.CallbackQuery):
+    cols = ["user_id", "lat", "lon", "timestamp", "weather"]
+    df = pd.read_csv('saved.csv', usecols=cols)
+    mask = df['user_id'] == callback_query.from_user.id
+    df = pd.DataFrame(df[mask])
+    if not df.empty:
+        df.to_csv('Weather_history.csv')
+        await bot.send_document(chat_id=callback_query.from_user.id, document=open('Weather_history.csv', 'rb'))
+        os.remove("Weather_history.csv")
+    else: 
+        await bot.send_message(callback_query.from_user.id,
+        'Вы не подписаны на сохранение истории погоды, подпишитесь :)')
+
+def save_weather(user_id, coordinates):
+    cols = ["user_id", "lat", "lon", "timestamp", "weather"]
     db = pd.read_csv('saved.csv', usecols=cols)
-    new_row = pd.DataFrame({'user_id': [user_id], 'timestamp': [datetime.now()], 'weather': [get_weather(get_coordinates())]})
+    new_row = pd.DataFrame({
+        'user_id': [user_id], 
+        'lat':[coordinates.latitude], 
+        'lon':[coordinates.longitude], 
+        'timestamp': [datetime.now()], 
+        'weather': [get_weather(coordinates)]})
     db.reset_index(drop=True, inplace=True)
     new_row.reset_index(drop=True, inplace=True)
     db = pd.concat([db, new_row], ignore_index=True)
@@ -207,18 +234,38 @@ def _parse_wind_direction(openweather_dict: dict) -> str:
 
 BTN_WEATHER = InlineKeyboardButton('Прогноз погоды по IP', callback_data='weather')
 BTN_CITY_WEATHER = InlineKeyboardButton('Прогноз погоды по введному городу', callback_data='city_weather')
-# BTN_SUBSCRIBE_FOR_HISTORY = InlineKeyboardButton('Подписаться на сохранение данных о погоде', callback_data='subscribe')
-# BTN_DOWNLOAD_WEATHER_HISTORY = InlineKeyboardButton('Прогноз погоды по введному городу', callback_data='weather_history')
+BTN_SUBSCRIBE_FOR_HISTORY = InlineKeyboardButton('Подписаться на сохранение данных о погоде', callback_data='subscribe')
+BTN_UNSUBSCRIBE_FROM_HISTORY = InlineKeyboardButton('Отписаться от сохранения данных', callback_data='unsubscribe')
+BTN_DOWNLOAD_WEATHER_HISTORY = InlineKeyboardButton('Скачать историю погоды', callback_data='download_weather_history')
 
-WEATHER = InlineKeyboardMarkup().add(BTN_WEATHER).add(BTN_CITY_WEATHER)
+WEATHER = InlineKeyboardMarkup().add(BTN_WEATHER).add(BTN_CITY_WEATHER).add(BTN_SUBSCRIBE_FOR_HISTORY).add(BTN_DOWNLOAD_WEATHER_HISTORY).add(BTN_UNSUBSCRIBE_FROM_HISTORY)
 HELP = InlineKeyboardMarkup().add(BTN_WEATHER)
 
-def saver():
-    save_weather(2222)
-    sleep(7)
+def get_subscribers():
+    cols = ["user_id", "lat", "lon", "timestamp", "weather"]
+    df = pd.read_csv('saved.csv', usecols=cols)
+    df = df.drop_duplicates('user_id')
+    arr = df.to_numpy()
+    for item in arr:
+        subscribers[item[0]] = Coordinates(item[1], item[2])
 
-def start_bot():
-    executor.start_polling(dp, skip_updates=True)
+def saver():
+    while True:
+        for user_id in subscribers:
+            save_weather(user_id, subscribers[user_id])
+        sleep(save_delay)
+        if event.is_set():
+            break
+
+event = Event()
+my_thread = Thread(target=saver)
+
+def stop_thread(props):
+    event.set()
+    my_thread.join()
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    get_subscribers()
+    my_thread.start()
+    executor.start_polling(dp, skip_updates=True, on_shutdown=stop_thread)
+    
